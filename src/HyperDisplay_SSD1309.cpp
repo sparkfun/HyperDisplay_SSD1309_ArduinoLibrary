@@ -51,7 +51,7 @@ void hwrectangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, color_t dat
 void hwfillFromArray(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint32_t numPixels, color_t data); 																															// More efficient fill from array implementation. Uses screen-relative coordinates
 
 */
-void SSD1309::hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0)
+void SSD1309::hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data, hd_colors_t colorCycleLength, hd_colors_t startColorOffset)
 {
 	hd_hw_extent_t startCol = x0;		// The way it works now the coordinates of a 'hw_____' function are already in hardware coordinates
 	hd_hw_extent_t startRow = y0;
@@ -345,7 +345,7 @@ SSD1309_Status_t SSD1309::setMemoryAddressingMode( uint8_t mode )
 {
 	uint8_t buff[2] = {
 		SSD1309_CMD_setMemoryAddressingMode,
-		(MODE & 0x03)
+		(mode & 0x03)
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -552,7 +552,25 @@ SSD1309_Arduino_I2C::SSD1309_Arduino_I2C(uint16_t xSize, uint16_t ySize) : hyper
 ////////////////////////////////////////////////////////////
 SSD1309_Status_t SSD1309_Arduino_I2C::writeBytes(uint8_t * pdata, bool DATAcmd, size_t numBytes)
 {
+	uint8_t addr = UG2856KLBAG01_BASE_ADDR;
+	if(_sa0val){ addr |= 0x01; }
 
+	_i2c->beginTransmission(addr);
+
+	if(DATAcmd){
+		// Data
+		_i2c->write(0b01000000);	// I think this byte would indicate the the next bytes are data
+	}else{
+		// Command
+		_i2c->write(0b10000000); // SSD1309 Datasheet pg. 20/62 - this should be the control byte when sending commands
+	}
+
+	_i2c->write(pdata, numBytes);	// It seems that after the command bye we can just send the desired data
+	
+	if(_i2c->endTransmission()){
+		// Some kind of error has occurred
+		return SSD1309_Error;
+	}
 
 	return SSD1309_Nominal;
 }
@@ -575,7 +593,7 @@ UG2856KLBAG01_I2C::UG2856KLBAG01_I2C( void ) : hyperdisplay(UG2856KLBAG01_WIDTH,
 
 }
 
-SSD1309_Status_t UG2856KLBAG01_I2C::begin(TwoWire &wirePort, uint8_t saoPin, bool sa0Val)
+SSD1309_Status_t UG2856KLBAG01_I2C::begin(TwoWire &wirePort, bool sa0Val, uint8_t saoPin)
 {
 	// Call the functions to setup the super classes
 // Associate 
@@ -587,7 +605,7 @@ SSD1309_Status_t UG2856KLBAG01_I2C::begin(TwoWire &wirePort, uint8_t saoPin, boo
 	if(_sa0 != SSD1309_ARD_I2C_UNUSED_PIN){ pinMode(_sa0, OUTPUT); }
 
 	// Set pins to default positions
-	if(_sa0 != SSD1309_ARD_I2C_UNUSED_PIN){ digitalWrite(_sa0, HIGH); }
+	if(_sa0 != SSD1309_ARD_I2C_UNUSED_PIN){ digitalWrite(_sa0, _sa0val); }
 
 	_i2c->begin();
 
@@ -603,8 +621,23 @@ SSD1309_Status_t UG2856KLBAG01_I2C::begin(TwoWire &wirePort, uint8_t saoPin, boo
 
 SSD1309_Status_t UG2856KLBAG01_I2C::defaultConfigure( void )
 {
-	// This is the suggested initialization routine from WiseChip (pg. 9 of the datasheet)
-	
+	// This is the suggested initialization routine from WiseChip (pg. 9 of the module datasheet)
+	setCommandLock(false);
+	setPower(false); 
+
+	setDisplayClockDivideRatio(0xA0);
+	setMultiplexRatio(0x37);
+	setDisplayOffset(0x00);
+	setDisplayStartLine(0x40);
+	setSegmentMapping(true);
+	setCOMoutputDirection(true);
+	setCOMpinsHWconfig(0x12);
+	setContrastControl(0x8F);
+	setPreChargePeriod(0x25);
+	setVCOMHdeselectLevel(0x34);
+	overrideRam(false);
+	setInversion(false);
+	setPower(true); 
 
   	return SSD1309_Nominal;
 }

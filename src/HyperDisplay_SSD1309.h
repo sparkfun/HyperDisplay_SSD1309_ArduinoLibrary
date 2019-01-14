@@ -255,13 +255,15 @@ public:
 // #define UG2856KLBAG01_STOP_ROW 	0x3F
 // #define UG2856KLBAG01_STOP_COL	0x5F
 
+#define UG2856KLBAG01_BASE_ADDR 0b0111100 // Or this with 0x01 if _sa0val true to get the 7-bit I2C address
+
 class UG2856KLBAG01_I2C : public SSD1309_Arduino_I2C{							// This is a particular display from WiseChip. Get it here: 
 private:
 protected:
 public:
 	UG2856KLBAG01_I2C( void );	// Note that since the hardware screen choice (UG2856KLBAG01) constrained the dimensions there are no more free parameters to pass to the initialization
 
-	SSD1309_Status_t begin(TwoWire &wirePort = Wire, uint8_t saoPin = SSD1309_ARD_I2C_UNUSED_PIN, bool sa0Val = false);
+	SSD1309_Status_t begin(TwoWire &wirePort = Wire, bool sa0Val = false, uint8_t saoPin = SSD1309_ARD_I2C_UNUSED_PIN);
 	SSD1309_Status_t defaultConfigure( void ); // The reccomended settings from the datasheet
 	void startup( void );		// The default startup for this particular display
 
