@@ -16,6 +16,7 @@ Authors: Owen Lyke
 ////////////////////////////////////////////////////////////
 //							Includes    				  //
 ////////////////////////////////////////////////////////////
+#include "Arduino.h"
 #include "hyperdisplay.h"		// Inherit drawing functions from this library
 #include "fast_hsv2rgb.h"		// Used to work with HSV color space		
 #include <Wire.h>				// Arduino SPI support
@@ -23,14 +24,48 @@ Authors: Owen Lyke
 ////////////////////////////////////////////////////////////
 //							Defines     				  //
 ////////////////////////////////////////////////////////////
-#define SSD1309_MAX_WIDTH 128
-#define SSD1309_MAX_HEIGHT 64
-#define SSD1309_START_ROW 0
-#define SSD1309_START_COL 0
-#define SSD1309_STOP_ROW 63
-#define SSD1309_STOP_COL 127
+#define SSD1309_MAX_WIDTH 	128
+#define SSD1309_MAX_HEIGHT 	64
+#define SSD1309_START_ROW 	0
+#define SSD1309_START_COL 	0
+#define SSD1309_START_PG 	0
+#define SSD1309_STOP_ROW 	63
+#define SSD1309_STOP_COL 	127
+#define SSD1309_STOP_PG		7
+
+#define SSD1309_RAM_BYTES (SSD1309_MAX_WIDTH*(SSD1309_MAX_HEIGHT/8))
 
 // #define SSD1309_DEFAULT_WORKING_NUM_BYTES 2*64
+
+
+
+template <typename T>
+T nspoti(T i1){					// Nearest smaller power of two for integers
+	T retval = i1;				// Be explicit about passing by value
+	T bytesize = sizeof( T );	// Number of bytes (assuming 8 bits) that the type occupies
+	retval--; 					// In case we start on a power of two
+	if(retval == 0){ return 0; }
+	if(bytesize > 0){
+		retval |= (retval >> 1);
+		retval |= (retval >> 2);
+		retval |= (retval >> 4);
+	}
+	if(bytesize > 1){
+		retval |= (retval >> 8);
+	}
+	if(bytesize > 3){
+		retval |= (retval >> 16);
+	}
+	if(bytesize > 4){
+		return 0;
+	}
+	retval++;				// This will carry a one into the next highest bit - we now have the nearest greater power of two (thanks http://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2Float)
+	retval = retval >> 1; 	// This divides by two to get the nearest lower power of two
+	// retval += (retval == 0); // If you needed you could add this line to make sure that 0 is not returned
+	return retval;
+}
+
+
 
 ////////////////////////////////////////////////////////////
 //							Typedefs    				  //
@@ -123,23 +158,46 @@ public: // temporary
 
 	SSD1309_Intfc_t		_intfc;		// The interface mode being used					
 
+	uint16_t 				_i2cXferLen;
+	bool				_needsRefresh;
+	hd_hw_extent_t		_pgRefStart, _pgRefEnd;
+	hd_hw_extent_t		_colRefStart, _colRefEnd;
+
 	// This function defines how you talk to the driver, and it is very implementation-specific (e.g. depends on the interface mode, among others)
 	virtual SSD1309_Status_t writeBytes(uint8_t * pdata, bool DATAcmd, size_t numBytes) = 0;	// Pure virtual forces implementation in derived classes
 	virtual SSD1309_Status_t selectDriver( void );												// Allows the user to implement a device-select function (does not force you to though)
 	virtual SSD1309_Status_t deselectDriver( void );											// Allows the user to implement a device-deselect function
 
 	// These are internally available utility functions
-	color_t 	getOffsetColor(color_t base, uint32_t numPixels);	// (required by hyperdisplay)
+	color_t 				getOffsetColor(color_t base, uint32_t numPixels);	// (required by hyperdisplay)
+	SSD1309_Status_t		refreshDisplay( void );
+	SSD1309_Status_t 		updateRefreshZone( hd_hw_extent_t colStart, hd_hw_extent_t colEnd, hd_hw_extent_t rowStart, hd_hw_extent_t rowEnd );
+	SSD1309_Status_t		setMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y);
+	SSD1309_Status_t		clearMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y);
 
 public:
 
 	// Here is the main API implementation that allows this class to hook into the hyperdisplay library
-    void hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0); 																										// Single pixel write. Required by hyperdisplay. Uses screen-relative coordinates
-    // void hwxline(uint16_t x0, uint16_t y0, uint16_t len, color_t data, uint16_t colorCycleLength = 1, uint16_t startColorOffset = 0, bool goLeft = false); 		// More efficient xline imp. Uses screen-relative coordinates
-    // void hwyline(uint16_t x0, uint16_t y0, uint16_t len, color_t data, uint16_t colorCycleLength = 1, uint16_t startColorOffset = 0, bool goUp = false); 			// More efficient yline imp. Uses screen-relative coordinates
-    // void hwrectangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, color_t data, bool filled = false, uint16_t colorCycleLength = 1, uint16_t startColorOffset = 0, bool gradientVertical = false, bool reverseGradient = false); 	// More efficient rectangle imp in window-relative coordinates
-    // void hwfillFromArray(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint32_t numPixels, color_t data); 													// More efficient fill from array implementation. Uses screen-relative coordinates
+    void hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0); 																																	// Single pixel write. Required by hyperdisplay. Uses screen-relative coordinates
+    // void hwxline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool goLeft = false); 																						// More efficient xline imp. Uses screen-relative coordinates
+    // void hwyline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool goUp = false); 																							// More efficient yline imp. Uses screen-relative coordinates
+    // void hwrectangle(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, bool filled = false, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool reverseGradient = false, bool gradientVertical = false); 	// More efficient rectangle imp in window-relative coordinates
+    // void hwfillFromArray(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, color_t data = NULL, hd_pixels_t numPixels = 0,  bool Vh = false );	 																																									// More efficient fill from array implementation. Uses screen-relative coordinates
 
+
+    // Functions that don't need color arguments, for simplicity.
+    void pixelSet(hd_extent_t x0, hd_extent_t y0);
+    void pixelClear(hd_extent_t x0, hd_extent_t y0);
+    void rectangleSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, bool filled = false); 
+    void rectangleClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, bool filled = false); 
+    #if HYPERDISPLAY_DRAWING_LEVEL > 0
+        void lineSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, uint16_t width = 1); 
+	    void lineClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, uint16_t width = 1); 
+	    void polygonSet(hd_extent_t x[], hd_extent_t y[], uint8_t numSides, uint16_t width = 1);
+	    void polygonClear(hd_extent_t x[], hd_extent_t y[], uint8_t numSides, uint16_t width = 1);
+	    void circleSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t radius, bool filled = false); 
+	    void circleClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t radius, bool filled = false); 
+    #endif /* HYPERDISPLAY_DRAWING_LEVEL > 0 */        
 
 	// Here are all of the settings you can change on the SSD1309 - they use the writeBytes API 
 	// Fundamental Commands
@@ -161,8 +219,8 @@ public:
 	SSD1309_Status_t contentScrollSetupLeft(uint8_t PSA, uint8_t PEA, uint8_t CSA, uint8_t CEA);
 
 	// Addressing Setting Command Table
-	SSD1309_Status_t setLowCSAinPAM( uint8_t low ); 			// Note: this command should be OR'd with the desired Page Address Mode Lower Nibble of Column Start Address when it is sent
-	SSD1309_Status_t setHighCSAinPAM( uint8_t high );			// This command also OR'd with the high nibble...
+	SSD1309_Status_t setLowCSAinPAM( uint8_t CSA ); 			// Note: this command should be OR'd with the desired Page Address Mode Lower Nibble of Column Start Address when it is sent
+	SSD1309_Status_t setHighCSAinPAM( uint8_t CSA );			// This command also OR'd with the high nibble...
 	SSD1309_Status_t setMemoryAddressingMode( uint8_t mode );	// Only for horizontal or vertical addressing mode...
 	SSD1309_Status_t setColumnAddress(uint8_t CSA, uint8_t CEA);
 	SSD1309_Status_t setPageAddress(uint8_t PSA, uint8_t PEA);
@@ -225,8 +283,15 @@ instantiate an object of this class.
 ////////////////////////////////////////////////////////////
 // Here are a few implementation-specific classes that can be used on the appropirate system
 #define SSD1309_ARD_I2C_UNUSED_PIN 0xFF
+#define SSD1309_BASE_ADDR 0b0111100 // Or this with 0x01 if _sa0val true to get the 7-bit I2C address
 
-class SSD1309_Arduino_I2C: public SSD1309{									// General for use with Arduino / SPI with arbitrary display size
+#ifdef BUFFER_LENGTH										// For some reason Arduino chose BUFFER_LENGTH to mean the I2C buffer length in Wire.h, so  if that is defined we will *assume* thats what it means
+	#define SSD1309_I2C_BUFFER_LENGTH BUFFER_LENGTH
+#else
+	#define SSD1309_I2C_BUFFER_LENGTH 32					// In case BUFFER_LENGTH is not defined we will fall back to 32
+#endif
+
+class SSD1309_Arduino_I2C: public SSD1309{									// General for use with Arduino using I2C with arbitrary display size
 private:
 protected:
 
@@ -243,37 +308,5 @@ public:
 };
 
 
-
-////////////////////////////////////////////////////////////
-//				UG6464TDDBG01 Display Class    			  //
-////////////////////////////////////////////////////////////
-
-#define UG2856KLBAG01_WIDTH 	128
-#define UG2856KLBAG01_HEIGHT 	56
-// #define UG2856KLBAG01_START_ROW	0x00
-// #define UG2856KLBAG01_START_COL	0x20
-// #define UG2856KLBAG01_STOP_ROW 	0x3F
-// #define UG2856KLBAG01_STOP_COL	0x5F
-
-#define UG2856KLBAG01_BASE_ADDR 0b0111100 // Or this with 0x01 if _sa0val true to get the 7-bit I2C address
-
-class UG2856KLBAG01_I2C : public SSD1309_Arduino_I2C{							// This is a particular display from WiseChip. Get it here: 
-private:
-protected:
-public:
-	UG2856KLBAG01_I2C( void );	// Note that since the hardware screen choice (UG2856KLBAG01) constrained the dimensions there are no more free parameters to pass to the initialization
-
-	SSD1309_Status_t begin(TwoWire &wirePort = Wire, bool sa0Val = false, uint8_t saoPin = SSD1309_ARD_I2C_UNUSED_PIN);
-	SSD1309_Status_t defaultConfigure( void ); // The reccomended settings from the datasheet
-	void startup( void );		// The default startup for this particular display
-
-	// void getCharInfo(uint8_t val, char_info_t * pchar);
-
-	// Some specialized drawing frunctions
-	void clearDisplay( void );
-
-	// Special Functions
-	void setWindowDefaults(wind_info_t * pwindow); // Overrrides default implementation in hyperdisplay class
-};
 
 #endif /* HPYERDISPLAY_SSD1309_H */

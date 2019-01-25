@@ -5,6 +5,11 @@
 SSD1309::SSD1309(uint16_t xSize, uint16_t ySize, SSD1309_Intfc_t interface) : hyperdisplay(xSize, ySize)
 {
 	_intfc = interface;
+	_needsRefresh = false;
+	_pgRefStart = 0;
+	_pgRefEnd = 0;
+	_colRefStart = 0;
+	_colRefEnd = 0;
 }
 
 
@@ -31,39 +36,223 @@ color_t 	getOffsetColor(color_t base, uint32_t numPixels);	// (required by hyper
 
 */
 color_t 	SSD1309::getOffsetColor(color_t base, uint32_t numPixels)
-{
-	// This function returns an offset pointer according to the number of pixels and the _colorMode of the object
-	
-	// TBD
+{	
 	return base;
+	// return (color_t)(((SSD1309_Bite_t*)base + numPixels/8));
 }
+
+SSD1309_Status_t		SSD1309::refreshDisplay( void )
+{
+	if(!_needsRefresh){ return; }
+
+	// This function is used to re-send the most up-to-date RAM information to just a few memory locations (rather than the whole screen every time...)
+	// Compute where to start in the ram array and how many bytes to send out:
+	size_t offset = (SSD1309_MAX_WIDTH * _pgRefStart) + _colRefStart;
+	size_t numBytes = (_colRefEnd - _colRefStart + 1) + ((_pgRefEnd - _pgRefStart) * SSD1309_MAX_WIDTH);
+
+	// Setup the write
+	setMemoryAddressingMode( 0x00 ); // Horizontal Addressing Mode
+	setColumnAddress((uint8_t)_colRefStart, (uint8_t)_colRefEnd);
+	setPageAddress((uint8_t)_pgRefStart, (uint8_t)_pgRefEnd);
+
+	// Transmit the bytes
+	writeBytes((uint8_t*)(ramMirror + offset), true, numBytes);
+
+	_needsRefresh = false;
+}
+
+SSD1309_Status_t 		SSD1309::updateRefreshZone( hd_hw_extent_t colStart, hd_hw_extent_t colEnd, hd_hw_extent_t rowStart, hd_hw_extent_t rowEnd )
+{
+	hd_hw_extent_t pgEnd = rowEnd / 8;			// Convert to pages
+	hd_hw_extent_t pgStart = rowStart / 8;
+	if(_needsRefresh){
+		// A refresh is pending from some other operation:
+		// Take the largest bounds
+		_pgRefStart = min(_pgRefStart, pgStart);
+		_pgRefEnd = max(_pgRefEnd, pgEnd);
+		_colRefStart = min(_colRefStart, colStart);
+		_colRefEnd = max(_colRefEnd, colEnd);
+	}else{
+		_pgRefStart = pgStart;
+		_pgRefEnd = pgEnd;
+		_colRefStart = colStart;
+		_colRefEnd = colEnd;
+	}
+	_needsRefresh = true;
+}
+
+
+SSD1309_Status_t		SSD1309::setMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y)
+{
+	uint8_t temp = (*(ramMirror + ((SSD1309_MAX_WIDTH * (y/8)) + x))).bite;
+	temp |= (0x01 << (y % 8));
+	(*(ramMirror + ((SSD1309_MAX_WIDTH * (y/8)) + x))).bite = temp;
+}
+
+SSD1309_Status_t		SSD1309::clearMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y)
+{
+	uint8_t temp = (*(ramMirror + ((SSD1309_MAX_WIDTH * (y/8)) + x))).bite;
+	temp &= (~(0x01 << (y % 8)));
+	(*(ramMirror + ((SSD1309_MAX_WIDTH * (y/8)) + x))).bite = temp;
+}
+
 
 
 ////////////////////////////////////////////////////////////
 //				    Hyperdisplay API    				  //
 ////////////////////////////////////////////////////////////
 /*
-
-void hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0); 																							// Single pixel write. Required by hyperdisplay. Uses screen-relative coordinates
-void hwxline(uint16_t x0, uint16_t y0, uint16_t len, color_t data, uint16_t colorCycleLength = 1, uint16_t startColorOffset = 0, bool goLeft = false); 																					// More efficient xline imp. Uses screen-relative coordinates
-void hwyline(uint16_t x0, uint16_t y0, uint16_t len, color_t data, uint16_t colorCycleLength = 1, uint16_t startColorOffset = 0, bool goUp = false); 																					// More efficient yline imp. Uses screen-relative coordinates
-void hwrectangle(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, color_t data, bool filled = false, uint16_t colorCycleLength = 1, uint16_t startColorOffset = 0, bool gradientVertical = false, bool reverseGradient = false); 	// More efficient rectangle imp in window-relative coordinates
-void hwfillFromArray(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint32_t numPixels, color_t data); 																															// More efficient fill from array implementation. Uses screen-relative coordinates
-
+    // void hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0); 																																	
+    // void hwxline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool goLeft = false); 																					
+    // void hwyline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool goUp = false); 																						
+    // void hwrectangle(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, bool filled = false, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool reverseGradient = false, bool gradientVertical = false); 
+    // void hwfillFromArray(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, color_t data = NULL, hd_pixels_t numPixels = 0,  bool Vh = false );	
 */
 void SSD1309::hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data, hd_colors_t colorCycleLength, hd_colors_t startColorOffset)
 {
-	hd_hw_extent_t startCol = x0;		// The way it works now the coordinates of a 'hw_____' function are already in hardware coordinates
-	hd_hw_extent_t startRow = y0;
+	if(colorCycleLength == 0){ return; }
 
-	if(data == NULL){ return; }
-	if((startCol < SSD1309_START_COL) || (startCol > SSD1309_STOP_COL)){ return; }
-	if((startRow < SSD1309_START_ROW) || (startRow > SSD1309_STOP_ROW)){ return; }
+	startColorOffset = getNewColorOffset(colorCycleLength, startColorOffset, 0);	// This line is needed to condition the user's input start color offset because it could be greater than the cycle length
+	color_t value = getOffsetColor(data, startColorOffset);
 
-	// startColorOffset = getNewColorOffset(colorCycleLength, startColorOffset, 0);	// This line is needed to condition the user's input start color offset
-	// color_t value = getOffsetColor(data, startColorOffset);
-	// write_ram(value, startRow, startCol, startRow, startCol, 1);	// Write 1 pixel to the location (startCol, startRow)
+	SSD1309_Bite_t user = *((SSD1309_Bite_t*)value);
+	if(user.b0){									// Check if the user's bit is set or not (this implies that the user should always set bit 0 of a 'bite' to the pixel value they want)
+		// Need to set the pixel high	
+		setMirrorPixel(x0, y0);
+	}else{
+		// Need to clear the pixel
+		clearMirrorPixel(x0, y0);
+	}
+	updateRefreshZone( x0, x0, y0, y0);			// Tell where we need updates
+	refreshDisplay();								// Perform updates
 }
+
+// void SSD1309::hwxline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data, hd_colors_t colorCycleLength, hd_colors_t startColorOffset, bool goLeft)
+// {
+// 	if(colorCycleLength == 0){ return; }
+
+// 	startColorOffset = getNewColorOffset(colorCycleLength, startColorOffset, 0);	// This line is needed to condition the user's input start color offset because it could be greater than the cycle length
+// 	color_t value = getOffsetColor(data, startColorOffset);
+
+// 	if(goLeft)
+// 	{
+// 		for(hd_hw_extent_t indi = 0; indi < len; indi++)
+// 		{
+// 			SSD1309_Bite_t user = *((SSD1309_Bite_t*)value);
+// 			if(user.b0){ setMirrorPixel(x0 - indi, y0); }
+// 			else{ clearMirrorPixel(x0 - indi, y0); }
+// 			// updateRefreshZone( x0 - indi, x0, y0, y0);
+// 			// startColorOffset = getNewColorOffset(colorCycleLength, startColorOffset, 1);
+// 			// value = getOffsetColor(data, startColorOffset);
+// 		}
+// 		updateRefreshZone( x0 - len + 1, x0, y0, y0);
+// 	}
+// 	else
+// 	{
+// 		for(hd_hw_extent_t indi = 0; indi < len; indi++)
+// 		{
+// 			SSD1309_Bite_t user = *((SSD1309_Bite_t*)value);
+// 			if(user.b0){ setMirrorPixel(x0 + indi, y0); }
+// 			else{ clearMirrorPixel(x0 + indi, y0); }
+// 			// updateRefreshZone( x0, x0 + indi, y0, y0);
+// 			// startColorOffset = getNewColorOffset(colorCycleLength, startColorOffset, 1);
+// 			// value = getOffsetColor(data, startColorOffset);
+// 		}
+// 		updateRefreshZone( x0, x0 + len - 1, y0, y0);
+// 	}
+// 	refreshDisplay();								// Perform updates
+// }	
+
+
+
+
+
+
+
+
+
+
+
+
+// void SSD1309::hwyline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data, hd_colors_t colorCycleLength, hd_colors_t startColorOffset, bool goUp)
+// {
+// 	// To implement this consider writing 0xFF bytes into a single column
+// }
+
+
+
+
+// Functions that don't need color arguments, for simplicity.
+void SSD1309::pixelSet(hd_extent_t x0, hd_extent_t y0)
+{
+	SSD1309_Bite_t pix;
+	pix.bite = 0xFF;
+	pixel(x0, y0, (color_t)&pix);
+}
+
+void SSD1309::pixelClear(hd_extent_t x0, hd_extent_t y0)
+{
+	SSD1309_Bite_t pix;
+	pix.bite = 0x00;
+	pixel(x0, y0, (color_t)&pix);
+}
+
+void SSD1309::rectangleSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, bool filled)
+{
+	SSD1309_Bite_t pix;
+	pix.bite = 0xFF;
+	rectangle( x0, y0, x1, y1, filled,  (color_t)&pix); 
+}
+
+void SSD1309::rectangleClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, bool filled)
+{
+	SSD1309_Bite_t pix;
+	pix.bite = 0x00;
+	rectangle( x0, y0, x1, y1, filled,  (color_t)&pix);
+}
+
+#if HYPERDISPLAY_DRAWING_LEVEL > 0
+    void SSD1309::lineSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, uint16_t width)
+    {
+    	SSD1309_Bite_t pix;
+		pix.bite = 0xFF;
+    	line( x0, y0, x1, y1, width, (color_t)&pix); 
+    }
+
+    void SSD1309::lineClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, uint16_t width)
+    {
+		SSD1309_Bite_t pix;
+		pix.bite = 0x00;
+    }
+
+    void SSD1309::polygonSet(hd_extent_t x[], hd_extent_t y[], uint8_t numSides, uint16_t width)
+    {
+		SSD1309_Bite_t pix;
+		pix.bite = 0xFF;
+		polygon( x, y, numSides, width, (color_t)&pix);
+    }
+
+    void SSD1309::polygonClear(hd_extent_t x[], hd_extent_t y[], uint8_t numSides, uint16_t width)
+    {
+		SSD1309_Bite_t pix;
+		pix.bite = 0x00;
+		polygon( x, y, numSides, width, (color_t)&pix);
+    }
+
+    void SSD1309::circleSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t radius, bool filled)
+    {
+		SSD1309_Bite_t pix;
+		pix.bite = 0xFF;
+		circle( x0, y0, radius, filled, (color_t)&pix); 
+    }
+
+    void SSD1309::circleClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t radius, bool filled)
+    {
+		SSD1309_Bite_t pix;
+		pix.bite = 0x00;
+		circle( x0, y0, radius, filled, (color_t)&pix); 
+    }
+#endif /* HYPERDISPLAY_DRAWING_LEVEL > 0 */       
 
 
 
@@ -319,10 +508,10 @@ SSD1309_Status_t SSD1309::contentScrollSetupLeft(uint8_t PSA, uint8_t PEA, uint8
 
 
 // Addressing Setting Command Table
-SSD1309_Status_t SSD1309::setLowCSAinPAM( uint8_t low )
+SSD1309_Status_t SSD1309::setLowCSAinPAM( uint8_t CSA )
 {	// Note: this command should be OR'd with the desired Page Address Mode Lower Nibble of Column Start Address when it is sent
 	uint8_t buff[1] = {
-		(SSD1309_CMD_setLowCSAinPAM | (low & 0x0F))
+		(SSD1309_CMD_setLowCSAinPAM | (CSA & 0x0F))
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -330,10 +519,10 @@ SSD1309_Status_t SSD1309::setLowCSAinPAM( uint8_t low )
 	return retval;
 }
  			
-SSD1309_Status_t SSD1309::setHighCSAinPAM( uint8_t high )
+SSD1309_Status_t SSD1309::setHighCSAinPAM( uint8_t CSA )
 {	// This command also OR'd with the high nibble...
 	uint8_t buff[1] = {
-		(SSD1309_CMD_setHighCSAinPAM | (high >> 4))
+		(SSD1309_CMD_setHighCSAinPAM | (CSA >> 4))
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -544,7 +733,8 @@ SSD1309_Status_t SSD1309::setVCOMHdeselectLevel(uint8_t LVL)
 ////////////////////////////////////////////////////////////
 SSD1309_Arduino_I2C::SSD1309_Arduino_I2C(uint16_t xSize, uint16_t ySize) : hyperdisplay(xSize, ySize), SSD1309(xSize, ySize, SSD1309_Intfc_I2C)
 {
-
+	// Find nearest (lower) power of two from the I2C buffer length
+	_i2cXferLen = nspoti <uint16_t> (SSD1309_I2C_BUFFER_LENGTH - 2); // We subtract two because one is for the device address (worst case) and the second is for the control byte. 
 }
 
 ////////////////////////////////////////////////////////////
@@ -552,26 +742,38 @@ SSD1309_Arduino_I2C::SSD1309_Arduino_I2C(uint16_t xSize, uint16_t ySize) : hyper
 ////////////////////////////////////////////////////////////
 SSD1309_Status_t SSD1309_Arduino_I2C::writeBytes(uint8_t * pdata, bool DATAcmd, size_t numBytes)
 {
-	uint8_t addr = UG2856KLBAG01_BASE_ADDR;
+	uint8_t addr = SSD1309_BASE_ADDR;
 	if(_sa0val){ addr |= 0x01; }
 
-	_i2c->beginTransmission(addr);
+	SSD1309_Status_t retval = SSD1309_Nominal;
 
 	if(DATAcmd){
-		// Data
-		_i2c->write(0b01000000);	// I think this byte would indicate the the next bytes are data
+		// Data is sent all in a row, using only one device address and control byte header
+		for(size_t indi = 0; indi < (numBytes / _i2cXferLen); indi++){
+			_i2c->beginTransmission(addr);
+			_i2c->write(0x40);
+			_i2c->write(pdata, _i2cXferLen);
+			if(_i2c->endTransmission()){
+				retval |= SSD1309_Error;
+			}
+		}
+		_i2c->beginTransmission(addr);
+		_i2c->write(0x40);
+		_i2c->write(pdata, (numBytes % _i2cXferLen));
+		if(_i2c->endTransmission()){
+			retval |= SSD1309_Error;
+		}
 	}else{
-		// Command
-		_i2c->write(0b10000000); // SSD1309 Datasheet pg. 20/62 - this should be the control byte when sending commands
+		// Commands are sent one byte at a time, each with the device address and 0x00 control byte first
+		for(size_t indi = 0; indi < numBytes; indi++){
+			_i2c->beginTransmission(addr);
+			_i2c->write(0x00);
+			_i2c->write(*(pdata+indi));
+			if(_i2c->endTransmission()){
+				retval |= SSD1309_Error;
+			}
+		}
 	}
-
-	_i2c->write(pdata, numBytes);	// It seems that after the command bye we can just send the desired data
-	
-	if(_i2c->endTransmission()){
-		// Some kind of error has occurred
-		return SSD1309_Error;
-	}
-
 	return SSD1309_Nominal;
 }
 
@@ -582,134 +784,3 @@ SSD1309_Status_t SSD1309_Arduino_I2C::writeBytes(uint8_t * pdata, bool DATAcmd, 
 
 
 
-////////////////////////////////////////////////////////////
-//				UG6464TDDBG01 Implementation			  //
-////////////////////////////////////////////////////////////
-char_info_t UG6464TDDBG01_Default_CharInfo;
-wind_info_t UG6464TDDBG01_Default_Window;
-
-UG2856KLBAG01_I2C::UG2856KLBAG01_I2C( void ) : hyperdisplay(UG2856KLBAG01_WIDTH, UG2856KLBAG01_HEIGHT), SSD1309_Arduino_I2C(UG2856KLBAG01_WIDTH, UG2856KLBAG01_HEIGHT)
-{
-
-}
-
-SSD1309_Status_t UG2856KLBAG01_I2C::begin(TwoWire &wirePort, bool sa0Val, uint8_t saoPin)
-{
-	// Call the functions to setup the super classes
-// Associate 
-	_sa0 = saoPin;
-	_i2c = &wirePort;
-	_sa0val = sa0Val;
-
-	// Set pinmodes
-	if(_sa0 != SSD1309_ARD_I2C_UNUSED_PIN){ pinMode(_sa0, OUTPUT); }
-
-	// Set pins to default positions
-	if(_sa0 != SSD1309_ARD_I2C_UNUSED_PIN){ digitalWrite(_sa0, _sa0val); }
-
-	_i2c->begin();
-
-	// Setup the default window
-	setWindowDefaults(pCurrentWindow);
-
-	// Power up the device
-	startup();	
-	defaultConfigure();
-
-	return SSD1309_Nominal;
-}
-
-SSD1309_Status_t UG2856KLBAG01_I2C::defaultConfigure( void )
-{
-	// This is the suggested initialization routine from WiseChip (pg. 9 of the module datasheet)
-	setCommandLock(false);
-	setPower(false); 
-
-	setDisplayClockDivideRatio(0xA0);
-	setMultiplexRatio(0x37);
-	setDisplayOffset(0x00);
-	setDisplayStartLine(0x40);
-	setSegmentMapping(true);
-	setCOMoutputDirection(true);
-	setCOMpinsHWconfig(0x12);
-	setContrastControl(0x8F);
-	setPreChargePeriod(0x25);
-	setVCOMHdeselectLevel(0x34);
-	overrideRam(false);
-	setInversion(false);
-	setPower(true); 
-
-  	return SSD1309_Nominal;
-}
-
-void UG2856KLBAG01_I2C::startup( void )
-{
-	// Assume that VDD and VCC are stable when this function is called
-	delay(20);
-	digitalWrite(_rst, LOW);
-	// delayMicroseconds(10);
-	delay(5);
-	digitalWrite(_rst, HIGH);
-	delay(200);
-	// Now you can do initialization
-}
-
-// void UG6464TDDBG01::getCharInfo(uint8_t val, char_info_t * pchar)
-// {
-// 	char_info_t * pcharinfo = &UG6464TDDBG01_Default_CharInfo;
-// 	// Do stuff to fill out the default char info structure, then return a pointer to it
-// 	pcharinfo->data = NULL;						// Color information for each pixel to be drawn
-// 	pcharinfo->xLoc = NULL;						// X location wrt upper-left corner of char location(cursor) for each pixel
-// 	pcharinfo->yLoc = NULL;						// Y location wrt upper-left corner of char location(cursor) for each pixel
-//     pcharinfo->numPixels = 0;					// Number of pixels contained in the data, xLoc, and yLoc arrays
-// 	pcharinfo->show = false;					// Whether or not to actually show the character
-// 	pcharinfo->causedNewline = false;			// Whether or not the character triggered/triggers a new line
-// }
-
-
-void UG2856KLBAG01_I2C::clearDisplay( void )
-{
-	// Store the old window pointer: 
-	wind_info_t * ptempWind = pCurrentWindow;
-
-	// Make a new default window
-	wind_info_t window;
-	pCurrentWindow = &window;
-
-	// Ensure the window is set up so that you can clear the whole screen
-	setWindowDefaults(&window);
-
-	// Make a local 'black' color 
-	uint8_t temp_buff[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};				// This buffer is long enough to represent '0' no matter what color mode is selected
-	
-	// Fill the temporary window with black
-	fillWindow((color_t)temp_buff);												// Pass the address of the buffer b/c we know it will be safe no matter what SSD1309 color mode is used
-
-	// Restore the previous window
-	pCurrentWindow = ptempWind;
-}
-
-void UG2856KLBAG01_I2C::setWindowDefaults(wind_info_t * pwindow)
-{
-	// // Fills out the default window structure with more or less reasonable defaults
-	// pwindow->xMin = UG6464TDDBG01_START_COL;
-	// pwindow->yMin = UG6464TDDBG01_START_ROW;
-	// pwindow->xMax = UG6464TDDBG01_STOP_COL;
-	// pwindow->yMax = UG6464TDDBG01_STOP_ROW;
-	// pwindow->cursorX = 0;							// cursor values are in window coordinates
-	// pwindow->cursorY = 0;
-	// pwindow->xReset = 0;
-	// pwindow->yReset = 0;
-	
-	// pwindow->lastCharacter.data = NULL;
-	// pwindow->lastCharacter.xLoc = NULL;
-	// pwindow->lastCharacter.yLoc = NULL;
-	// pwindow->lastCharacter.xDim = 0;
-	// pwindow->lastCharacter.yDim = 0;
-	// pwindow->lastCharacter.numPixels = 0;
-	// pwindow->lastCharacter.show = false;
-	// pwindow->lastCharacter.causesNewline = false;
-	
-	// pwindow->data = NULL;				// No window data yet
-	// setCurrentWindowColorSequence(NULL, 1, 0);	// Setup the default color (Which is NULL, so that you know it is not set yet)
-}
