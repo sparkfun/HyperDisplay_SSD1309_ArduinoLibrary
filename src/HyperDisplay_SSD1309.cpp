@@ -43,7 +43,7 @@ color_t 	SSD1309::getOffsetColor(color_t base, uint32_t numPixels)
 
 SSD1309_Status_t		SSD1309::refreshDisplay( void )
 {
-	if(!_needsRefresh){ return; }
+	if(!_needsRefresh){ return SSD1309_NoRefresh; }
 
 	// This function is used to re-send the most up-to-date RAM information to just a few memory locations (rather than the whole screen every time...)
 	// Compute where to start in the ram array and how many bytes to send out:
@@ -59,6 +59,7 @@ SSD1309_Status_t		SSD1309::refreshDisplay( void )
 	writeBytes((uint8_t*)(ramMirror + offset), true, numBytes);
 
 	_needsRefresh = false;
+	return SSD1309_Nominal;
 }
 
 SSD1309_Status_t 		SSD1309::updateRefreshZone( hd_hw_extent_t colStart, hd_hw_extent_t colEnd, hd_hw_extent_t rowStart, hd_hw_extent_t rowEnd )
@@ -79,6 +80,7 @@ SSD1309_Status_t 		SSD1309::updateRefreshZone( hd_hw_extent_t colStart, hd_hw_ex
 		_colRefEnd = colEnd;
 	}
 	_needsRefresh = true;
+	return SSD1309_Nominal;
 }
 
 
@@ -87,6 +89,7 @@ SSD1309_Status_t		SSD1309::setMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y)
 	uint8_t temp = (*(ramMirror + ((SSD1309_MAX_WIDTH * (y/8)) + x))).bite;
 	temp |= (0x01 << (y % 8));
 	(*(ramMirror + ((SSD1309_MAX_WIDTH * (y/8)) + x))).bite = temp;
+	return SSD1309_Nominal;
 }
 
 SSD1309_Status_t		SSD1309::clearMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y)
@@ -94,6 +97,7 @@ SSD1309_Status_t		SSD1309::clearMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y)
 	uint8_t temp = (*(ramMirror + ((SSD1309_MAX_WIDTH * (y/8)) + x))).bite;
 	temp &= (~(0x01 << (y % 8)));
 	(*(ramMirror + ((SSD1309_MAX_WIDTH * (y/8)) + x))).bite = temp;
+	return SSD1309_Nominal;
 }
 
 
@@ -735,6 +739,7 @@ SSD1309_Arduino_I2C::SSD1309_Arduino_I2C(uint16_t xSize, uint16_t ySize) : hyper
 {
 	// Find nearest (lower) power of two from the I2C buffer length
 	_i2cXferLen = nspoti <uint16_t> (SSD1309_I2C_BUFFER_LENGTH - 2); // We subtract two because one is for the device address (worst case) and the second is for the control byte. 
+	_rst = SSD1309_ARD_UNUSED_PIN;
 }
 
 ////////////////////////////////////////////////////////////
@@ -745,23 +750,25 @@ SSD1309_Status_t SSD1309_Arduino_I2C::writeBytes(uint8_t * pdata, bool DATAcmd, 
 	uint8_t addr = SSD1309_BASE_ADDR;
 	if(_sa0val){ addr |= 0x01; }
 
-	SSD1309_Status_t retval = SSD1309_Nominal;
+	uint16_t retval = (uint16_t)SSD1309_Nominal;
 
 	if(DATAcmd){
 		// Data is sent all in a row, using only one device address and control byte header
+		uint32_t offset = 0;
 		for(size_t indi = 0; indi < (numBytes / _i2cXferLen); indi++){
 			_i2c->beginTransmission(addr);
 			_i2c->write(0x40);
 			_i2c->write(pdata, _i2cXferLen);
+			offset += _i2cXferLen;
 			if(_i2c->endTransmission()){
-				retval |= SSD1309_Error;
+				retval |= (uint16_t)SSD1309_Error;
 			}
 		}
 		_i2c->beginTransmission(addr);
 		_i2c->write(0x40);
-		_i2c->write(pdata, (numBytes % _i2cXferLen));
+		_i2c->write((pdata + offset), (numBytes % _i2cXferLen));
 		if(_i2c->endTransmission()){
-			retval |= SSD1309_Error;
+			retval |= (uint16_t)SSD1309_Error;
 		}
 	}else{
 		// Commands are sent one byte at a time, each with the device address and 0x00 control byte first
@@ -770,11 +777,11 @@ SSD1309_Status_t SSD1309_Arduino_I2C::writeBytes(uint8_t * pdata, bool DATAcmd, 
 			_i2c->write(0x00);
 			_i2c->write(*(pdata+indi));
 			if(_i2c->endTransmission()){
-				retval |= SSD1309_Error;
+				retval |= (uint16_t)SSD1309_Error;
 			}
 		}
 	}
-	return SSD1309_Nominal;
+	return (SSD1309_Status_t)retval;
 }
 
 
@@ -784,3 +791,60 @@ SSD1309_Status_t SSD1309_Arduino_I2C::writeBytes(uint8_t * pdata, bool DATAcmd, 
 
 
 
+
+
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////
+//		SSD1309_Arduino_SPI_OneWay Implementation		  //
+////////////////////////////////////////////////////////////
+SSD1309_Arduino_SPI::SSD1309_Arduino_SPI(uint16_t xSize, uint16_t ySize) : hyperdisplay(xSize, ySize), SSD1309(xSize, ySize, SSD1309_Intfc_I2C)
+{
+	_rst = SSD1309_ARD_UNUSED_PIN;
+}
+
+////////////////////////////////////////////////////////////
+//				Display Interface Functions				  //
+////////////////////////////////////////////////////////////
+SSD1309_Status_t SSD1309_Arduino_SPI::writeBytes(uint8_t * pdata, bool DATAcmd, size_t numBytes)
+{
+	uint8_t addr = SSD1309_BASE_ADDR;	// Not used in SPI mode but still set for good practice
+
+	SSD1309_Status_t retval = SSD1309_Nominal;
+
+	_spi->beginTransaction(SPISettings(UG2856KLBAG01_SPI_FREQ_MAX, UG2856KLBAG01_SPI_ORDER, UG2856KLBAG01_SPI_MODE));
+
+	if(DATAcmd){
+		// In SPI mode data is indicated by the state of the _dc line so no control bytes are needed
+		digitalWrite(_dc, HIGH);
+		for(size_t indi = 0; indi < numBytes; indi++){
+			selectDriver();
+			_spi->transfer(*(pdata + indi));
+			deselectDriver();
+		}
+	}else{
+		// In SPI mode commands are indicated by the _dc line state, so no control bytes are needed
+		digitalWrite(_dc, LOW);
+		for(size_t indi = 0; indi < numBytes; indi++){
+			selectDriver();
+			_spi->transfer(*(pdata + indi));
+			deselectDriver();
+		}
+	}
+	_spi->endTransaction();
+	digitalWrite(_dc, HIGH);
+	return SSD1309_Nominal;
+}
+
+SSD1309_Status_t SSD1309_Arduino_SPI::selectDriver( void ){
+	digitalWrite(_cs, LOW);
+}
+SSD1309_Status_t SSD1309_Arduino_SPI::deselectDriver( void ){
+	digitalWrite(_cs, HIGH);
+}

@@ -16,10 +16,10 @@ Authors: Owen Lyke
 ////////////////////////////////////////////////////////////
 //							Includes    				  //
 ////////////////////////////////////////////////////////////
+#include "hyperdisplay.h"		// Inherit drawing functions from this library	
 #include "Arduino.h"
-#include "hyperdisplay.h"		// Inherit drawing functions from this library
-#include "fast_hsv2rgb.h"		// Used to work with HSV color space		
-#include <Wire.h>				// Arduino SPI support
+#include "Wire.h"				// Arduino I2C support
+#include "SPI.h"				// Arduino SPI support
 
 ////////////////////////////////////////////////////////////
 //							Defines     				  //
@@ -72,7 +72,8 @@ T nspoti(T i1){					// Nearest smaller power of two for integers
 ////////////////////////////////////////////////////////////
 typedef enum{
 	SSD1309_Nominal = 0,
-	SSD1309_Error
+	SSD1309_Error,
+	SSD1309_NoRefresh,
 }SSD1309_Status_t;
 
 typedef enum{
@@ -158,7 +159,6 @@ public: // temporary
 
 	SSD1309_Intfc_t		_intfc;		// The interface mode being used					
 
-	uint16_t 				_i2cXferLen;
 	bool				_needsRefresh;
 	hd_hw_extent_t		_pgRefStart, _pgRefEnd;
 	hd_hw_extent_t		_colRefStart, _colRefEnd;
@@ -278,11 +278,14 @@ instantiate an object of this class.
 */
 
 
+// Here are a few implementation-specific classes that can be used on the appropirate system
+#define SSD1309_ARD_UNUSED_PIN 0xFF
+
+
 ////////////////////////////////////////////////////////////
 //					Arduino I2C Class   	 			  //
 ////////////////////////////////////////////////////////////
-// Here are a few implementation-specific classes that can be used on the appropirate system
-#define SSD1309_ARD_I2C_UNUSED_PIN 0xFF
+
 #define SSD1309_BASE_ADDR 0b0111100 // Or this with 0x01 if _sa0val true to get the 7-bit I2C address
 
 #ifdef BUFFER_LENGTH										// For some reason Arduino chose BUFFER_LENGTH to mean the I2C buffer length in Wire.h, so  if that is defined we will *assume* thats what it means
@@ -297,9 +300,11 @@ protected:
 
 	SSD1309_Arduino_I2C(uint16_t xSize, uint16_t ySize);	// Interface is removed from parameters because it is constrained to I2C in this derived class
 
+	size_t 		_i2cXferLen;
+
 	uint8_t 	_rst, _sa0;		// Pin definitions
 	bool 		_sa0val;
-	TwoWire * 	_i2c;				// Which I2C port to use
+	TwoWire * 	_i2c;			// Which I2C port to use
 
 public:
 	SSD1309_Status_t writeBytes(uint8_t * pdata, bool DATAcmd, size_t numBytes);
@@ -307,6 +312,36 @@ public:
 	// SSD1309_Status_t deselectDriver( void );
 };
 
+
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////
+//					Arduino SPI Class   	 			  //
+////////////////////////////////////////////////////////////
+#define UG2856KLBAG01_SPI_FREQ_MAX 	5000000	// once tested up to 10 MHz
+#define UG2856KLBAG01_SPI_MODE 		SPI_MODE3
+#define UG2856KLBAG01_SPI_ORDER		MSBFIRST
+
+class SSD1309_Arduino_SPI: public SSD1309{									// General for use with Arduino using I2C with arbitrary display size
+private:
+protected:
+
+	SSD1309_Arduino_SPI(uint16_t xSize, uint16_t ySize);	// Interface is removed from parameters because it is constrained to I2C in this derived class
+
+	uint8_t 	_rst, _cs, _dc;		// Pin definitions
+	SPIClass * 	_spi;				// Which I2C port to use
+
+public:
+	SSD1309_Status_t writeBytes(uint8_t * pdata, bool DATAcmd, size_t numBytes);
+	SSD1309_Status_t selectDriver( void );
+	SSD1309_Status_t deselectDriver( void );
+};
 
 
 #endif /* HPYERDISPLAY_SSD1309_H */
