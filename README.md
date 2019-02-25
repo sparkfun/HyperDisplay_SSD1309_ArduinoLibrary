@@ -1,7 +1,7 @@
-HyperDisplay Arduino Library
+SparkFun HyperDisplay SSD1309 Arduino Library
 ========================================
 
-Providing uniform drawing and printing functions for a wide range of displays in the Arduino environment
+Standardized library for control of displays using the SSD1309 driver IC.
 
 
 Repository Contents
@@ -20,6 +20,7 @@ Documentation
 Products that use this Library 
 ---------------------------------
 
+* [Transparent Graphical OLED](https://www.sparkfun.com/products/15173)
 
 Version History
 ---------------
