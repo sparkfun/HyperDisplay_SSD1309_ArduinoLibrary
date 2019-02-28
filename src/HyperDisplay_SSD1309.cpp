@@ -187,6 +187,31 @@ void SSD1309::hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data, hd_col
 
 
 // Functions that don't need color arguments, for simplicity.
+
+void SSD1309::windowSet(wind_info_t* pwindow)
+{
+	wind_info_t* ptemp = NULL;
+	SSD1309_Bite_t pix;
+	pix.bite = 0xFF;
+
+	if(pwindow != NULL){ ptemp = pCurrentWindow; pCurrentWindow = pwindow; } // Store current window and change to the desired window
+	fillWindow((color_t)&pix);  
+	if(ptemp != NULL){ pCurrentWindow = ptemp; } // Restore the old window, if needed
+}
+
+void SSD1309::windowClear(wind_info_t* pwindow)
+{
+	wind_info_t* ptemp = NULL;
+	SSD1309_Bite_t pix;
+	pix.bite = 0x00;
+
+	if(pwindow != NULL){ ptemp = pCurrentWindow; pCurrentWindow = pwindow; } // Store current window and change to the desired window
+	fillWindow((color_t)&pix);  
+	if(ptemp != NULL){ pCurrentWindow = ptemp; } // Restore the old window, if needed
+}
+
+
+
 void SSD1309::pixelSet(hd_extent_t x0, hd_extent_t y0)
 {
 	SSD1309_Bite_t pix;

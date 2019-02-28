@@ -186,6 +186,9 @@ public:
 
 
     // Functions that don't need color arguments, for simplicity.
+	
+	void windowSet(wind_info_t* pwindow = NULL);
+	void windowClear(wind_info_t* pwindow = NULL);
     void pixelSet(hd_extent_t x0, hd_extent_t y0);
     void pixelClear(hd_extent_t x0, hd_extent_t y0);
     void rectangleSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, bool filled = false); 
