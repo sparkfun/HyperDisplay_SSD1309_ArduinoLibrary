@@ -24,6 +24,8 @@ updateRefreshZone	KEYWORD2
 setMirrorPixel	KEYWORD2
 clearMirrorPixel	KEYWORD2
 hwpixel	KEYWORD2
+windowSet	KEYWORD2
+windowClear	KEYWORD2
 pixelSet	KEYWORD2
 pixelClear	KEYWORD2
 rectangleSet	KEYWORD2
