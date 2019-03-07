@@ -25,6 +25,7 @@ Products that use this Library
 Version History
 ---------------
 
+* [V1.0.0](https://github.com/sparkfun/HyperDisplay_SSD1309_ArduinoLibrary/releases/tag/v1.0.0) -- Initial release
 
 License Information
 -------------------
