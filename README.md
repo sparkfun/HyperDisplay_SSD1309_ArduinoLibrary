@@ -20,7 +20,7 @@ Documentation
 Products that use this Library 
 ---------------------------------
 
-* [Transparent Graphical OLED](https://www.sparkfun.com/products/15173)
+* [Transparent Graphical OLED [LCD-15173]](https://www.sparkfun.com/products/15173)
 
 Version History
 ---------------
