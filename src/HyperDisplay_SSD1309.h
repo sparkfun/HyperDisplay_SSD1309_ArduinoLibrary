@@ -9,8 +9,8 @@ Authors: Owen Lyke
 
 */
 
-#ifndef HPYERDISPLAY_SSD1309_H
-#define HPYERDISPLAY_SSD1309_H
+#ifndef HYPERDISPLAY_SSD1309_H
+#define HYPERDISPLAY_SSD1309_H
 
 
 ////////////////////////////////////////////////////////////
@@ -347,4 +347,4 @@ public:
 };
 
 
-#endif /* HPYERDISPLAY_SSD1309_H */
+#endif /* HYPERDISPLAY_SSD1309_H */
