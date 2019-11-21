@@ -23,8 +23,8 @@ SSD1309_Status_t selectDriver( void );												// Optional virtual
 SSD1309_Status_t deselectDriver( void );											// Optional virtual
 
 */
-SSD1309_Status_t SSD1309::selectDriver( void ){}		// Default implementation is 'empty' (I mean inconsequential) so that the compiler may optimize it away 
-SSD1309_Status_t SSD1309::deselectDriver( void ){}	// Default implementation is 'empty' (I mean inconsequential) so that the compiler may optimize it away 										
+SSD1309_Status_t SSD1309::selectDriver( void ){ return SSD1309_NotImplemented; }		// Default implementation is 'empty' (rather 'inconsequential') so that the compiler may optimize it away 
+SSD1309_Status_t SSD1309::deselectDriver( void ){ return SSD1309_NotImplemented; }	// Default implementation is 'empty' (rather 'inconsequential') so that the compiler may optimize it away 										
 
 
 ////////////////////////////////////////////////////////////
@@ -407,9 +407,9 @@ SSD1309_Status_t SSD1309::contHScrollSetupRight(uint8_t PSA, uint8_t interval, u
 	uint8_t buff[8] = {
 		SSD1309_CMD_contHScrollSetupRight,
 		0x00,
-		(PSA & 0x07),
-		(interval & 0x07),
-		(PEA & 0x07),
+		(uint8_t)(PSA & 0x07),
+		(uint8_t)(interval & 0x07),
+		(uint8_t)(PEA & 0x07),
 		0x00,
 		CSA,
 		CEA
@@ -425,9 +425,9 @@ SSD1309_Status_t SSD1309::contHScrollSetupLeft(uint8_t PSA, uint8_t interval, ui
 	uint8_t buff[8] = {
 		SSD1309_CMD_contHScrollSetupLeft,
 		0x00,
-		(PSA & 0x07),
-		(interval & 0x07),
-		(PEA & 0x07),
+		(uint8_t)(PSA & 0x07),
+		(uint8_t)(interval & 0x07),
+		(uint8_t)(PEA & 0x07),
 		0x00,
 		CSA,
 		CEA
@@ -443,9 +443,9 @@ SSD1309_Status_t SSD1309::contVHScrollSetupRight(bool horiz, uint8_t PSA, uint8_
 	uint8_t buff[8] = {
 		SSD1309_CMD_contVHScrollSetupRight,
 		0x00,
-		(PSA & 0x07),
-		(interval & 0x07),
-		(PEA & 0x07),
+		(uint8_t)(PSA & 0x07),
+		(uint8_t)(interval & 0x07),
+		(uint8_t)(PEA & 0x07),
 		0x00,
 		CSA,
 		CEA
@@ -461,9 +461,9 @@ SSD1309_Status_t SSD1309::contVHScrollSetupLeft(bool horiz, uint8_t PSA, uint8_t
 	uint8_t buff[8] = {
 		SSD1309_CMD_contVHScrollSetupLeft,
 		0x00,
-		(PSA & 0x07),
-		(interval & 0x07),
-		(PEA & 0x07),
+		(uint8_t)(PSA & 0x07),
+		(uint8_t)(interval & 0x07),
+		(uint8_t)(PEA & 0x07),
 		0x00,
 		CSA,
 		CEA
@@ -490,8 +490,8 @@ SSD1309_Status_t SSD1309::setVScrollArea(uint8_t TFA, uint8_t SA)
 {
 	uint8_t buff[3] = {
 		SSD1309_CMD_setVScrollArea,
-		(TFA & 0x3F),
-		(SA & 0x7F)
+		(uint8_t)(TFA & 0x3F),
+		(uint8_t)(SA & 0x7F)
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -504,9 +504,9 @@ SSD1309_Status_t SSD1309::contentScrollSetupRight(uint8_t PSA, uint8_t PEA, uint
 	uint8_t buff[8] = {
 		SSD1309_CMD_contentScrollSetupRight,
 		0x00,
-		(PSA & 0x07),
+		(uint8_t)(PSA & 0x07),
 		0x01,
-		(PEA & 0x07),
+		(uint8_t)(PEA & 0x07),
 		0x00,
 		CSA,
 		CEA
@@ -522,9 +522,9 @@ SSD1309_Status_t SSD1309::contentScrollSetupLeft(uint8_t PSA, uint8_t PEA, uint8
 	uint8_t buff[8] = {
 		SSD1309_CMD_contentScrollSetupLeft,
 		0x00,
-		(PSA & 0x07),
+		(uint8_t)(PSA & 0x07),
 		0x01,
-		(PEA & 0x07),
+		(uint8_t)(PEA & 0x07),
 		0x00,
 		CSA,
 		CEA
@@ -540,7 +540,7 @@ SSD1309_Status_t SSD1309::contentScrollSetupLeft(uint8_t PSA, uint8_t PEA, uint8
 SSD1309_Status_t SSD1309::setLowCSAinPAM( uint8_t CSA )
 {	// Note: this command should be OR'd with the desired Page Address Mode Lower Nibble of Column Start Address when it is sent
 	uint8_t buff[1] = {
-		(SSD1309_CMD_setLowCSAinPAM | (CSA & 0x0F))
+		(uint8_t)(SSD1309_CMD_setLowCSAinPAM | (CSA & 0x0F))
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -551,7 +551,7 @@ SSD1309_Status_t SSD1309::setLowCSAinPAM( uint8_t CSA )
 SSD1309_Status_t SSD1309::setHighCSAinPAM( uint8_t CSA )
 {	// This command also OR'd with the high nibble...
 	uint8_t buff[1] = {
-		(SSD1309_CMD_setHighCSAinPAM | (CSA >> 4))
+		(uint8_t)(SSD1309_CMD_setHighCSAinPAM | (CSA >> 4))
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -563,7 +563,7 @@ SSD1309_Status_t SSD1309::setMemoryAddressingMode( uint8_t mode )
 {
 	uint8_t buff[2] = {
 		SSD1309_CMD_setMemoryAddressingMode,
-		(mode & 0x03)
+		(uint8_t)(mode & 0x03)
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -588,8 +588,8 @@ SSD1309_Status_t SSD1309::setPageAddress(uint8_t PSA, uint8_t PEA)
 {
 	uint8_t buff[3] = {
 		SSD1309_CMD_setPageAddress,
-		(PSA & 0x07),
-		(PEA & 0x07)
+		(uint8_t)(PSA & 0x07),
+		(uint8_t)(PEA & 0x07)
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -600,7 +600,7 @@ SSD1309_Status_t SSD1309::setPageAddress(uint8_t PSA, uint8_t PEA)
 SSD1309_Status_t SSD1309::setPSAinPAM( uint8_t PSA )
 {	// Note: OR this with 3 Least Significant bits that represent the page start address
 	uint8_t buff[1] = {
-		(SSD1309_CMD_setPSAinPAM | (PSA & 0x07))
+		(uint8_t)(SSD1309_CMD_setPSAinPAM | (PSA & 0x07))
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -611,7 +611,7 @@ SSD1309_Status_t SSD1309::setPSAinPAM( uint8_t PSA )
 SSD1309_Status_t SSD1309::setDisplayStartLine( uint8_t DSL )
 {	// Note: OR this with 6 Least Significant Bits that represent the display start line
 	uint8_t buff[1] = {
-		(SSD1309_CMD_setDisplayStartLine | (DSL & 0x3F))
+		(uint8_t)(SSD1309_CMD_setDisplayStartLine | (DSL & 0x3F))
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -635,7 +635,7 @@ SSD1309_Status_t SSD1309::setMultiplexRatio(	uint8_t MUXR)
 {
 	uint8_t buff[2] = {
 		SSD1309_CMD_setMultiplexRatio,
-		(MUXR & 0x3F)
+		(uint8_t)(MUXR & 0x3F)
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -659,7 +659,7 @@ SSD1309_Status_t SSD1309::setDisplayOffset(uint8_t OFST)
 {
 	uint8_t buff[2] = {
 		SSD1309_CMD_setDisplayOffset,
-		(OFST & 0x3F)
+		(uint8_t)(OFST & 0x3F)
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -671,7 +671,7 @@ SSD1309_Status_t SSD1309::setCOMpinsHWconfig(uint8_t CONF)
 {
 	uint8_t buff[2] = {
 		SSD1309_CMD_setCOMpinsHWconfig,
-		(0x02 | (CONF & 0x30))
+		(uint8_t)(0x02 | (CONF & 0x30))
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -683,7 +683,7 @@ SSD1309_Status_t SSD1309::setGPIO(uint8_t SET)
 {
 	uint8_t buff[2] = {
 		SSD1309_CMD_setGPIO,
-		(SET & 0x03)
+		(uint8_t)(SET & 0x03)
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -721,7 +721,7 @@ SSD1309_Status_t SSD1309::setVCOMHdeselectLevel(uint8_t LVL)
 {
 	uint8_t buff[2] = {
 		SSD1309_CMD_setVCOMHdeselectLevel,
-		(LVL & 0x3C)
+		(uint8_t)(LVL & 0x3C)
 	};
 	selectDriver();
 	SSD1309_Status_t retval = writeBytes(buff, false, sizeof(buff));
@@ -869,7 +869,9 @@ SSD1309_Status_t SSD1309_Arduino_SPI::writeBytes(uint8_t * pdata, bool DATAcmd, 
 
 SSD1309_Status_t SSD1309_Arduino_SPI::selectDriver( void ){
 	digitalWrite(_cs, LOW);
+	return SSD1309_Nominal;
 }
 SSD1309_Status_t SSD1309_Arduino_SPI::deselectDriver( void ){
 	digitalWrite(_cs, HIGH);
+	return SSD1309_Nominal;
 }

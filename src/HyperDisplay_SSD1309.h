@@ -74,6 +74,9 @@ typedef enum{
 	SSD1309_Nominal = 0,
 	SSD1309_Error,
 	SSD1309_NoRefresh,
+	SSD1309_NotImplemented,
+
+	SSD1309_NumStatus
 }SSD1309_Status_t;
 
 typedef enum{
@@ -327,7 +330,7 @@ public:
 ////////////////////////////////////////////////////////////
 //					Arduino SPI Class   	 			  //
 ////////////////////////////////////////////////////////////
-#define UG2856KLBAG01_SPI_FREQ_MAX 	5000000	// once tested up to 10 MHz
+#define UG2856KLBAG01_SPI_FREQ_MAX 	8000000	// once tested up to 10 MHz
 #define UG2856KLBAG01_SPI_MODE 		SPI_MODE3
 #define UG2856KLBAG01_SPI_ORDER		MSBFIRST
 
