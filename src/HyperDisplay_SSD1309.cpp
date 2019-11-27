@@ -188,6 +188,24 @@ void SSD1309::hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data, hd_col
 
 // Functions that don't need color arguments, for simplicity.
 
+void SSD1309::setWindowColorSet(wind_info_t* pwindow){
+	if(pwindow == NULL){
+		setWindowColorSequence(pCurrentWindow, (color_t)(&colorSet));
+	}
+	else{
+		setWindowColorSequence(pwindow, (color_t)(&colorSet));
+	}
+}
+
+void SSD1309::setWindowColorClear(wind_info_t* pwindow){
+	if(pwindow == NULL){
+		setWindowColorSequence(pCurrentWindow, (color_t)(&colorClear));
+	}
+	else{
+		setWindowColorSequence(pwindow, (color_t)(&colorClear));
+	}
+}
+
 void SSD1309::windowSet(wind_info_t* pwindow)
 {
 	wind_info_t* ptemp = NULL;

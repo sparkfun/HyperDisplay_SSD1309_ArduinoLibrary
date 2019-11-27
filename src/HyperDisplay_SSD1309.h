@@ -180,30 +180,34 @@ public: // temporary
 
 public:
 
+	SSD1309_Bite_t colorSet = {0x01};
+	SSD1309_Bite_t colorClear = {0x00};
+
 	// Here is the main API implementation that allows this class to hook into the hyperdisplay library
-    void hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0); 																																	// Single pixel write. Required by hyperdisplay. Uses screen-relative coordinates
-    // void hwxline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool goLeft = false); 																						// More efficient xline imp. Uses screen-relative coordinates
-    // void hwyline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool goUp = false); 																							// More efficient yline imp. Uses screen-relative coordinates
-    // void hwrectangle(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, bool filled = false, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool reverseGradient = false, bool gradientVertical = false); 	// More efficient rectangle imp in window-relative coordinates
-    // void hwfillFromArray(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, color_t data = NULL, hd_pixels_t numPixels = 0,  bool Vh = false );	 																																									// More efficient fill from array implementation. Uses screen-relative coordinates
+	void hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0); 																																	// Single pixel write. Required by hyperdisplay. Uses screen-relative coordinates
+	// void hwxline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool goLeft = false); 																						// More efficient xline imp. Uses screen-relative coordinates
+	// void hwyline(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t len, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool goUp = false); 																							// More efficient yline imp. Uses screen-relative coordinates
+	// void hwrectangle(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, bool filled = false, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool reverseGradient = false, bool gradientVertical = false); 	// More efficient rectangle imp in window-relative coordinates
+	// void hwfillFromArray(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, color_t data = NULL, hd_pixels_t numPixels = 0,  bool Vh = false );	 																																									// More efficient fill from array implementation. Uses screen-relative coordinates
 
 
-    // Functions that don't need color arguments, for simplicity.
-	
+	// Functions that don't need color arguments, for simplicity.
+	void setWindowColorSet(wind_info_t* pwindow = NULL);
+	void setWindowColorClear(wind_info_t* pwindow = NULL);
 	void windowSet(wind_info_t* pwindow = NULL);
 	void windowClear(wind_info_t* pwindow = NULL);
-    void pixelSet(hd_extent_t x0, hd_extent_t y0);
-    void pixelClear(hd_extent_t x0, hd_extent_t y0);
-    void rectangleSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, bool filled = false); 
-    void rectangleClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, bool filled = false); 
-    #if HYPERDISPLAY_DRAWING_LEVEL > 0
-        void lineSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, uint16_t width = 1); 
-	    void lineClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, uint16_t width = 1); 
-	    void polygonSet(hd_extent_t x[], hd_extent_t y[], uint8_t numSides, uint16_t width = 1);
-	    void polygonClear(hd_extent_t x[], hd_extent_t y[], uint8_t numSides, uint16_t width = 1);
-	    void circleSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t radius, bool filled = false); 
-	    void circleClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t radius, bool filled = false); 
-    #endif /* HYPERDISPLAY_DRAWING_LEVEL > 0 */        
+	void pixelSet(hd_extent_t x0, hd_extent_t y0);
+	void pixelClear(hd_extent_t x0, hd_extent_t y0);
+	void rectangleSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, bool filled = false); 
+	void rectangleClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, bool filled = false); 
+#if HYPERDISPLAY_DRAWING_LEVEL > 0
+	void lineSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, uint16_t width = 1); 
+	void lineClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t x1, hd_extent_t y1, uint16_t width = 1); 
+	void polygonSet(hd_extent_t x[], hd_extent_t y[], uint8_t numSides, uint16_t width = 1);
+	void polygonClear(hd_extent_t x[], hd_extent_t y[], uint8_t numSides, uint16_t width = 1);
+	void circleSet(hd_extent_t x0, hd_extent_t y0, hd_extent_t radius, bool filled = false); 
+	void circleClear(hd_extent_t x0, hd_extent_t y0, hd_extent_t radius, bool filled = false); 
+#endif /* HYPERDISPLAY_DRAWING_LEVEL > 0 */        
 
 	// Here are all of the settings you can change on the SSD1309 - they use the writeBytes API 
 	// Fundamental Commands
