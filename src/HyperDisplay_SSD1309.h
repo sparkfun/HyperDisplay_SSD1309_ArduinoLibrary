@@ -177,6 +177,8 @@ public: // temporary
 	SSD1309_Status_t 		updateRefreshZone( hd_hw_extent_t colStart, hd_hw_extent_t colEnd, hd_hw_extent_t rowStart, hd_hw_extent_t rowEnd );
 	SSD1309_Status_t		setMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y);
 	SSD1309_Status_t		clearMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y);
+	SSD1309_Status_t		setWindowPixel(hd_hw_extent_t x, hd_hw_extent_t y, wind_info_t* pwindow = NULL);
+	SSD1309_Status_t		clearWindowPixel(hd_hw_extent_t x, hd_hw_extent_t y, wind_info_t* pwindow = NULL);
 
 public:
 
@@ -190,6 +192,8 @@ public:
 	// void hwrectangle(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, bool filled = false, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0, bool reverseGradient = false, bool gradientVertical = false); 	// More efficient rectangle imp in window-relative coordinates
 	// void hwfillFromArray(hd_hw_extent_t x0, hd_hw_extent_t y0, hd_hw_extent_t x1, hd_hw_extent_t y1, color_t data = NULL, hd_pixels_t numPixels = 0,  bool Vh = false );	 																																									// More efficient fill from array implementation. Uses screen-relative coordinates
 
+	// Buffered drawing API
+	void swpixel( hd_extent_t x0, hd_extent_t y0, color_t data = NULL, hd_colors_t colorCycleLength = 1, hd_colors_t startColorOffset = 0);
 
 	// Functions that don't need color arguments, for simplicity.
 	void setWindowColorSet(wind_info_t* pwindow = NULL);

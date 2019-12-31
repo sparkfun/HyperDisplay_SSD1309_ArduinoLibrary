@@ -1,6 +1,7 @@
 #include "HyperDisplay_SSD1309.h"
 
-
+const SSD1309_Bite_t ON = { 0x01 };
+const SSD1309_Bite_t OFF = { 0x00 };
 
 SSD1309::SSD1309(uint16_t xSize, uint16_t ySize, SSD1309_Intfc_t interface) : hyperdisplay(xSize, ySize)
 {
@@ -37,8 +38,29 @@ color_t 	getOffsetColor(color_t base, uint32_t numPixels);	// (required by hyper
 */
 color_t 	SSD1309::getOffsetColor(color_t base, uint32_t numPixels)
 {	
+	// For the SSD1309 this function will depend on the current window if it is available
+	wind_info_t* pwindow = pCurrentWindow;
+	if(pwindow != NULL){
+		SSD1309_Bite_t* mirror = (SSD1309_Bite_t*)pwindow->data;
+		if(mirror != NULL){
+			// Assume left->right top->bottom for full window width
+			uint8_t window_width = (pwindow->xMax - pwindow->xMin + 1);
+			uint8_t x = numPixels % window_width;
+			uint8_t y = numPixels / window_width;
+			uint8_t temp = (*(mirror + ((window_width * (y/8)) + x))).bite;
+			if(temp & (0x01 << (y % 8))){
+				return (color_t)0x01;
+			}else{
+				return (color_t)0x00;
+			}
+		}else{
+			return base; // Also be dumb when there is no mirror data
+		}
+	}else{
+		// When little information available fall back to 'dumb' implementation
+		return base;
+	}
 	return base;
-	// return (color_t)(((SSD1309_Bite_t*)base + numPixels/8));
 }
 
 SSD1309_Status_t		SSD1309::refreshDisplay( void )
@@ -100,6 +122,29 @@ SSD1309_Status_t		SSD1309::clearMirrorPixel(hd_hw_extent_t x, hd_hw_extent_t y)
 	return SSD1309_Nominal;
 }
 
+SSD1309_Status_t		SSD1309::setWindowPixel(hd_hw_extent_t x, hd_hw_extent_t y, wind_info_t* pwindow)
+{
+	pwindow = (pwindow == NULL) ? pCurrentWindow : pwindow;									// Fall back to current window if not secified
+	if(pwindow->data == NULL){ return SSD1309_Error; }
+
+	SSD1309_Bite_t* windowMirror = (SSD1309_Bite_t*)pwindow->data;
+	uint8_t temp = (*(windowMirror + (((pwindow->xMax - pwindow->xMin) * (y/8)) + x))).bite;
+	temp |= (0x01 << (y % 8));
+	(*(windowMirror + (((pwindow->xMax - pwindow->xMin) * (y/8)) + x))).bite = temp;
+	return SSD1309_Nominal;
+}
+
+SSD1309_Status_t		SSD1309::clearWindowPixel(hd_hw_extent_t x, hd_hw_extent_t y, wind_info_t* pwindow)
+{
+	pwindow = (pwindow == NULL) ? pCurrentWindow : pwindow;									// Fall back to current window if not secified
+	if(pwindow->data == NULL){ return SSD1309_Error; }
+
+	SSD1309_Bite_t* windowMirror = (SSD1309_Bite_t*)pwindow->data;
+	uint8_t temp = (*(windowMirror + (((pwindow->xMax - pwindow->xMin) * (y/8)) + x))).bite;
+	temp &= (~(0x01 << (y % 8)));
+	(*(windowMirror + (((pwindow->xMax - pwindow->xMin) * (y/8)) + x))).bite = temp;
+	return SSD1309_Nominal;
+}
 
 
 ////////////////////////////////////////////////////////////
@@ -118,6 +163,14 @@ void SSD1309::hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data, hd_col
 
 	startColorOffset = getNewColorOffset(colorCycleLength, startColorOffset, 0);	// This line is needed to condition the user's input start color offset because it could be greater than the cycle length
 	color_t value = getOffsetColor(data, startColorOffset);
+
+	// If value is either 0 or 1 then interpret it as a direct value...
+	if((uint32_t)data == 0x00){
+		value = (color_t)&OFF;
+	}
+	if((uint32_t)data == 0x01){
+		value = (color_t)&ON;
+	}
 
 	SSD1309_Bite_t user = *((SSD1309_Bite_t*)value);
 	if(user.b0){									// Check if the user's bit is set or not (this implies that the user should always set bit 0 of a 'bite' to the pixel value they want)
@@ -183,8 +236,30 @@ void SSD1309::hwpixel(hd_hw_extent_t x0, hd_hw_extent_t y0, color_t data, hd_col
 // 	// To implement this consider writing 0xFF bytes into a single column
 // }
 
+// Implementation of swpixel for SSD1309
+void SSD1309::swpixel( hd_extent_t x0, hd_extent_t y0, color_t data, hd_colors_t colorCycleLength, hd_colors_t startColorOffset)
+{
+	if(data == NULL){ return; }
+	if(colorCycleLength == 0){ return; }
 
+	startColorOffset = getNewColorOffset(colorCycleLength, startColorOffset, 0);	// This line is needed to condition the user's input start color offset because it could be greater than the cycle length
+	// color_t value = getOffsetColor(data, startColorOffset);
+	color_t value = data; 																												// have to skip color sequences in buffered writing mode
 
+	hd_hw_extent_t x0w = (hd_hw_extent_t)x0;	// Cast to hw extent type to be sure of integer values
+	hd_hw_extent_t y0w = (hd_hw_extent_t)y0;
+
+	SSD1309_Bite_t user = *((SSD1309_Bite_t*)value);
+	if(user.b0){									// Check if the user's bit is set or not (this implies that the user should always set bit 0 of a 'bite' to the pixel value they want)
+		// Need to set the pixel high	
+		setWindowPixel(x0, y0, pCurrentWindow);
+	}else{
+		// Need to clear the pixel
+		clearWindowPixel(x0, y0, pCurrentWindow);
+	}
+	// updateRefreshZone( x0, x0, y0, y0);			// Tell where we need updates
+	// refreshDisplay();								// Perform updates
+}
 
 // Functions that don't need color arguments, for simplicity.
 
