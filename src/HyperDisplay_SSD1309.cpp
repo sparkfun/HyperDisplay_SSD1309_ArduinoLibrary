@@ -252,10 +252,10 @@ void SSD1309::swpixel( hd_extent_t x0, hd_extent_t y0, color_t data, hd_colors_t
 	SSD1309_Bite_t user = *((SSD1309_Bite_t*)value);
 	if(user.b0){									// Check if the user's bit is set or not (this implies that the user should always set bit 0 of a 'bite' to the pixel value they want)
 		// Need to set the pixel high	
-		setWindowPixel(x0, y0, pCurrentWindow);
+		setWindowPixel(x0w, y0w, pCurrentWindow);
 	}else{
 		// Need to clear the pixel
-		clearWindowPixel(x0, y0, pCurrentWindow);
+		clearWindowPixel(x0w, y0w, pCurrentWindow);
 	}
 	// updateRefreshZone( x0, x0, y0, y0);			// Tell where we need updates
 	// refreshDisplay();								// Perform updates
